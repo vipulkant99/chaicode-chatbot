@@ -20,7 +20,6 @@
     "next": "15.5.0",
     "next-themes": "^0.4.6",
     "node-webvtt": "^1.9.4",
-    "openai": "^5.15.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hot-toast": "^2.6.0",
