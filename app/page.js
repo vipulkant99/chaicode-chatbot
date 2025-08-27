@@ -1,103 +1,214 @@
-import Image from "next/image";
+"use client";
+import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
+import { LoaderOne } from "./_components/loader";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm"; // for tables, strikethrough, task lists
+import rehypeHighlight from "rehype-highlight";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [chat, setChat] = useState([]);
+  const [darkMode, setDarkMode] = useState(true);
+  const [message, setMessage] = useState("");
+  const [courses, setCourses] = useState();
+  const [currentCourse, setCurrentCourse] = useState("");
+  const aiMessageBufferRef = useRef("");
+  const [loadingChat, setLoadingChat] = useState(false);
+  const chatEndRef = useRef(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chat]);
+
+  useEffect(() => {
+    //console.log("data is111: ");
+    const fetchCourses = async () => {
+      try {
+        const res = await fetch("/api/get-courses");
+        const data = await res.json();
+        console.log("main data is:", data);
+
+        setCourses(data);
+      } catch (err) {
+        console.error("Error fetching courses:", err);
+      }
+    };
+
+    fetchCourses();
+  }, []);
+
+  const handleSend = async () => {
+    setLoadingChat((val) => !val);
+
+    if (!message.trim()) return;
+
+    if (!currentCourse.trim()) {
+      toast.error("Please Select one course to start chatting with bot.");
+      return;
+    }
+
+    setChat((prev) => [
+      ...prev,
+      { user: "User", text: message },
+      { user: "AI", text: "" },
+    ]);
+    aiMessageBufferRef.current = "";
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/user-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: message, currentCourse: currentCourse }), // message = user’s input
+      });
+
+      //const data = await res.json();
+      // console.log("Chat response:", data);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = JSON.parse(line.slice(6));
+            console.log("stream data is:", data.content);
+            aiMessageBufferRef.current += data.content;
+
+            setChat((prev) => {
+              const updated = [...prev];
+              // Find last AI message (or create one if it's the first AI response)
+              if (
+                updated.length > 0 &&
+                updated[updated.length - 1].user === "AI"
+              ) {
+                updated[updated.length - 1].text = aiMessageBufferRef.current;
+              } else {
+                updated.push({ user: "AI", text: aiMessageBufferRef.current });
+              }
+              return updated;
+            });
+          }
+        }
+      }
+
+      // setChat((prevChat) => [
+      //   ...prevChat,
+      //   { user: "User", text: message },
+      //   { user: "AI", text: streamResponse },
+      // ]);
+      setLoadingChat((val) => !val);
+    } catch (error) {
+      toast.error(`Something went wrong error: ${error}`);
+    }
+  };
+
+  return (
+    <div
+      className={`${
+        darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"
+      } h-screen p-4 overflow-hidden`}
+    >
+      <div className="flex justify-between items-center mb-4">
+        <a
+          href="https://www.imvkc.in/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-4xl font-bold cursor-pointer hover:bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 hover:bg-clip-text hover:text-transparent hover:underline tracking-wide"
+        >
+          imvkc.in
+        </a>
+        <h1 className="text-2xl font-bold">ChaiCode Courses</h1>
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          className="px-4 py-2 rounded-lg shadow bg-blue-500 text-white"
+        >
+          Toggle {darkMode ? "Light" : "Dark"} Mode
+        </button>
+      </div>
+
+      <div className="flex flex-row gap-x-4 gap-y-0 h-[calc(100vh-theme(spacing.24))]">
+        {/* Left Column */}
+        <div className="flex w-1/5 flex-col items-center justify-center space-y-4 p-4 rounded-2xl shadow bg-white dark:bg-gray-800">
+          <div>
+            {!courses ? (
+              <LoaderOne />
+            ) : (
+              courses.map((course, index) => (
+                <div
+                  key={index}
+                  onClick={() => setCurrentCourse(course.name)}
+                  className={`${
+                    course.name === currentCourse ? "bg-gray-700" : ""
+                  } mt-4 py-3 px-8 font-semibold rounded-2xl text-xl uppercase cursor-pointer text-neutral-100`}
+                >
+                  <h1>{course.name}</h1>
+                </div>
+              ))
+            )}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Right Column - Chat */}
+        <div className="flex flex-col flex-1 rounded-2xl shadow bg-white dark:bg-gray-800">
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-2 p-4 mb-4">
+            {chat.length === 0 ? (
+              <h1 className="text-neutral-100/50 text-xl flex items-center justify-center h-full">
+                First Please select anyone course before starting...
+              </h1>
+            ) : (
+              chat.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`p-2 rounded-lg w-1/2 break-words whitespace-pre-wrap ${
+                    msg.user === "User"
+                      ? "bg-blue-500 text-white self-end ml-auto"
+                      : "bg-gray-300 dark:bg-gray-600 text-black dark:text-white self-start mr-auto"
+                  }`}
+                >
+                  {msg.text !== "" ? (
+                    <ReactMarkdown
+                      children={msg.text}
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight]}
+                    />
+                  ) : (
+                    <div className="py-2 flex gap-1 text-lg font-mono">
+                      Typing <LoaderOne />
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+            {/* {loadingChat && } */}
+            <div ref={chatEndRef} />
+          </div>
+          <div className="flex gap-2 p-4 shrink-0">
+            <input
+              type="text"
+              className="flex-1 p-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+              placeholder="Type a message..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            />
+            <button
+              onClick={handleSend}
+              disabled={loadingChat}
+              className="px-4 py-2 rounded-lg shadow bg-blue-500 text-white cursor-pointer"
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
