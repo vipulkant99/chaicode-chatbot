@@ -1,7 +1,19 @@
-function Header({ dark, setDarkMode }) {
+import { useTheme } from "next-themes";
+
+function Header() {
+  const { theme, setTheme } = useTheme();
+
+  function changeTheme() {
+    setTheme(theme === "dark" ? "light" : "dark");
+  }
   return (
-    <header className="dark:bg-gray-800 dark:border-gray-700 bg-white border-gray-200 border-b px-6 py-4">
+    <header className="dark:bg-neutral-950 dark:border-neutral-700 bg-white border-neutral-200 border-b px-6 py-4">
       <div className="flex justify-between items-center">
+        <img
+          src={theme === "dark" ? "chaicode-white.svg" : "chaicode-black.svg"}
+          alt="chaiCode"
+          className="w-50 h-10"
+        />
         <div>
           <a
             href="https://www.imvkc.in/"
@@ -12,12 +24,11 @@ function Header({ dark, setDarkMode }) {
             imvkc.in
           </a>
         </div>
-        <h1 className="text-2xl font-bold">ChaiCode Courses</h1>
         <button
-          onClick={setDarkMode}
-          className={`p-2 rounded-lg "dark:bg-gray-700 dark:hover:bg-gray-600 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 transition-colors`}
+          onClick={changeTheme}
+          className={`p-2 rounded-lg "dark:bg-neutral-700 dark:hover:bg-neutral-600 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 transition-colors`}
         >
-          {dark === "dark" ? "☀️" : "🌙"}
+          {theme === "dark" ? "☀️" : "🌙"}
         </button>
       </div>
     </header>
