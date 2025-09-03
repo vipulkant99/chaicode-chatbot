@@ -1,10 +1,13 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LoaderOne } from "./_components/loader";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm"; // for tables, strikethrough, task lists
 import rehypeHighlight from "rehype-highlight";
-import { MenuIcon } from "lucide-react";
+import rehypeRaw from "rehype-raw";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { MenuIcon, Send, SendHorizonal } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchCourses,
@@ -122,7 +125,7 @@ export default function Home() {
 
   return (
     <div
-      className={`dark:bg-neutral-950 dark:text-white bg-neutral-50 text-neutral-950 h-screen p-4 overflow-hidden`}
+      className={`dark:bg-neutral-950 dark:text-white bg-neutral-50 text-neutral-950 h-screen p-4 overflow-hidden `}
     >
       <div className="flex justify-between items-center mb-4">
         <img
@@ -200,11 +203,132 @@ export default function Home() {
                   }`}
                 >
                   {msg.content !== "" ? (
-                    <ReactMarkdown
-                      children={msg.content}
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight]}
-                    />
+                    <div className="text-sm leading-relaxed">
+                      {console.log(
+                        "stram data is",
+                        msg.content.replace(/\n{3,}/g, "\n\n").trim()
+                      )}
+                      <ReactMarkdown
+                        children={msg.content
+                          .replace(/\n{3,}/g, "\n\n")
+                          .replace(/\n+$/, "")
+                          .trim()}
+                        remarkPlugins={[remarkGfm]}
+                        //rehypePlugins={[rehypeRaw]}
+                        components={{
+                          p: ({ node, ...props }) => (
+                            <p
+                              className="text-neutral-800 dark:text-neutral-200"
+                              {...props}
+                            />
+                          ),
+                          h1: ({ node, ...props }) => (
+                            <h1 className="text-2xl font-bold" {...props} />
+                          ),
+                          h2: ({ node, ...props }) => (
+                            <h2 className="text-xl font-semibold" {...props} />
+                          ),
+                          h3: ({ node, ...props }) => (
+                            <h3 className="text-lg font-semibold" {...props} />
+                          ),
+                          ul: ({ node, ...props }) => (
+                            <ul className="list-disc list-inside" {...props} />
+                          ),
+                          ol: ({ node, ...props }) => (
+                            <ol
+                              className="list-decimal list-inside"
+                              {...props}
+                            />
+                          ),
+                          table: ({ node, ...props }) => (
+                            <div className="overflow-x-auto">
+                              <table
+                                className="min-w-full border-collapse border border-neutral-300 dark:border-neutral-700"
+                                {...props}
+                              />
+                            </div>
+                          ),
+                          thead: ({ node, ...props }) => (
+                            <thead
+                              className="bg-neutral-100 dark:bg-neutral-800"
+                              {...props}
+                            />
+                          ),
+                          tbody: ({ node, ...props }) => <tbody {...props} />,
+                          tr: ({ node, ...props }) => (
+                            <tr
+                              className="border-b border-neutral-200 dark:border-neutral-700"
+                              {...props}
+                            />
+                          ),
+                          th: ({ node, ...props }) => (
+                            <th
+                              className="border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-left font-semibold bg-neutral-50 dark:bg-neutral-800"
+                              {...props}
+                            />
+                          ),
+                          td: ({ node, ...props }) => (
+                            <td
+                              className="border border-neutral-300 dark:border-neutral-700 px-3 py-2"
+                              {...props}
+                            />
+                          ),
+                          code({
+                            node,
+                            inline,
+                            className,
+                            children,
+                            ...props
+                          }) {
+                            const match = /language-(\w+)/.exec(
+                              className || ""
+                            );
+                            const codeString = String(children);
+                            const [copied, setCopied] = useState(false);
+
+                            const handleCopy = () => {
+                              navigator.clipboard.writeText(codeString);
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 1500); // Reset after 1.5s
+                            };
+
+                            return !inline && match ? (
+                              <div className="relative group">
+                                <SyntaxHighlighter
+                                  style={vscDarkPlus}
+                                  language={match[1]}
+                                  PreTag="div"
+                                  customStyle={{
+                                    borderRadius: "0.5rem",
+                                    padding: "1rem",
+                                    fontSize: "0.9rem",
+                                    overflowX: "auto",
+                                  }}
+                                  {...props}
+                                >
+                                  {String(children).replace(/\n$/, "")}
+                                </SyntaxHighlighter>
+                                <button
+                                  onClick={handleCopy}
+                                  className={`absolute top-2 right-2 px-2 py-1 text-xs rounded 
+        bg-neutral-700 text-white transition-opacity duration-300 
+        opacity-0 group-hover:opacity-100`}
+                                >
+                                  {copied ? "✅ Copied!" : "📋 Copy code"}
+                                </button>
+                              </div>
+                            ) : (
+                              <code
+                                className="bg-neutral-800 text-neutral-100 px-1 py-0.5 rounded"
+                                {...props}
+                              >
+                                {children}
+                              </code>
+                            );
+                          },
+                        }}
+                      />
+                    </div>
                   ) : (
                     <div className="py-2 flex gap-1 text-lg font-mono">
                       Typing <LoaderOne />
@@ -216,21 +340,38 @@ export default function Home() {
             {/* {loadingChat && } */}
             <div ref={chatEndRef} />
           </div>
-          <div className="flex gap-2 p-4 shrink-0">
-            <input
-              type="text"
-              className="flex-1 p-2 border rounded-lg dark:bg-neutral-900 dark:text-white"
+          <div className="flex items-end justify-end gap-2 p-4 shrink-0 border rounded-lg ml-2.5">
+            <textarea
+              className="relative flex-1 p-2 border-none resize-none overflow-y-auto dark:bg-neutral-900 dark:text-white"
               placeholder="Type a message..."
+              style={{ border: "none", outline: "none", maxHeight: "192px" }}
               value={message}
-              onChange={(e) => dispatch(setMessage(e.target.value))}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onChange={(e) => {
+                dispatch(setMessage(e.target.value));
+
+                // Auto-resize with max height
+                e.target.style.height = "auto";
+                const scrollHeight = e.target.scrollHeight;
+                const maxHeight = 6 * 24; // 6 rows * ~24px per line
+                e.target.style.height = `${Math.min(
+                  scrollHeight,
+                  maxHeight
+                )}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              rows={1}
             />
             <button
               onClick={handleSend}
               disabled={loadingChat}
-              className="px-4 py-2 rounded-lg shadow bg-blue-500 text-white cursor-pointer"
+              className="absolute mr-2.5 size-10 p-2.5 flex items-center justify-center rounded-full shadow bg-neutral-950 text-white cursor-pointer self-end"
             >
-              Send
+              <SendHorizonal />
             </button>
           </div>
         </div>

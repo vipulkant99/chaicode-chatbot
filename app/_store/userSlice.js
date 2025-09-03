@@ -31,7 +31,6 @@ const chatSlice = createSlice({
         role: action.payload.role,
         content: action.payload.content,
       });
-      console.log("current chat is", state.chat);
     },
     updateLastMessage: (state, action) => {
       if (
@@ -96,9 +95,8 @@ export const sendMessages = createAsyncThunk(
   "userChat/sendMessage",
   async (
     { message, currentCourse, aiMessageBufferRef },
-    { dispatch, rejectWithValue }
+    { getState, dispatch, rejectWithValue }
   ) => {
-    console.log("we are here");
     try {
       if (!message.trim()) return;
 
@@ -121,10 +119,18 @@ export const sendMessages = createAsyncThunk(
         payload: "",
       });
 
+      console.log("my chat is11: ");
+      const { chat } = getState().userChat;
+      console.log("my chat is22: ", chat);
+
       const res = await fetch("/api/user-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: message, currentCourse: currentCourse }),
+        body: JSON.stringify({
+          query: message,
+          currentCourse: currentCourse,
+          chatHistory: chat,
+        }),
       });
 
       if (!res.ok) throw new Error("Failed to fetch chat response");
@@ -143,7 +149,6 @@ export const sendMessages = createAsyncThunk(
         for (const line of lines) {
           if (line.startsWith("data: ")) {
             const data = JSON.parse(line.slice(6));
-            console.log("stream data is:", data.content);
             aiMessageBufferRef.current += data.content;
 
             dispatch({
