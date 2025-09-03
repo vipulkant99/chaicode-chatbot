@@ -18,7 +18,6 @@ export async function GET(req) {
         info: info,
       });
     }
-    console.log("data is:", details);
 
     return new Response(JSON.stringify(details), {
       status: 200,
